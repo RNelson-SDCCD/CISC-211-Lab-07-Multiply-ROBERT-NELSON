@@ -14,7 +14,7 @@
 .type nameStr,%gnu_unique_object
     
 /*** STUDENTS: Change the next line to your name!  **/
-nameStr: .asciz "Inigo Montoya"  
+nameStr: .asciz "Robert Nelson"  
 
 .align   /* realign so that next mem allocations are on word boundaries */
  
@@ -89,6 +89,210 @@ asmMult:
     
     /*** STUDENTS: Place your code BELOW this line!!! **************/
     
+    /* START initialize to zero */
+    ldr r2, =a_Multiplicand
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =b_Multiplier
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =rng_Error
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =a_Sign
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =b_Sign
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =prod_Is_Neg
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =a_Abs
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =b_Abs
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =init_Product
+    ldr r3, =0
+    str r3, [r2]
+    
+    ldr r2, =final_Product
+    ldr r3, =0
+    str r3, [r2]
+    /* END initialize to zero */
+    
+    /* Copy r0 and r1 into multiplicand and multiplier */
+    ldr r2, =a_Multiplicand
+    str r0, [r2]
+    
+    ldr r2, =b_Multiplier
+    str r1, [r2]
+    
+    /* Check range of args to fit within 16b signed int */
+    ldr r2, =32767
+    cmp r0, r2
+    bgt error
+    
+    ldr r2, =-32768
+    cmp r0, r2
+    blt error
+    
+    ldr r2, =32767
+    cmp r1, r2
+    bgt error
+    
+    ldr r2, =-32768
+    cmp r1, r2
+    blt error
+    
+    /***
+     * Get sign bit of both arguments
+     * Do this by performing a logical shift
+     * We want to fill with leading zeros to get only 1 or 0
+    ***/
+    mov r3, r0
+    lsr r3, 31
+    ldr r2, =a_Sign
+    str r3, [r2]
+    
+    mov r3, r1
+    lsr r3, 31
+    ldr r2, =b_Sign
+    str r3, [r2]
+    
+    ldr r2, =a_Sign
+    ldr r3, =b_Sign
+    ldr r2, [r2]
+    ldr r3, [r3]
+    
+    /***
+     * If the signs are equal, result will be positive
+     * If not equal, result will be negative
+     * Compare signs to one another, then check if one argument is zero
+     * Zero is considered positive, so a zero result will override negative
+    ***/
+    cmp r2, r3
+    
+    mov r5, 1
+    ldr r4, =prod_Is_Neg
+    moveq r5, 0
+    
+    cmp r0, 0
+    moveq r5, 0
+    
+    cmp r1, 0
+    moveq r5, 0
+    
+    str r5, [r4]
+    
+    /***
+     * Get the absolute value of our arguments
+     * This is done by performing a negation (pseudo-instruction for RSB)
+     * If either argument is zero, that means they are already its abs
+     * Take this value and store it into its respective *_Abs
+    ***/
+    mov r3, r0
+    cmp r3, 0
+    bge a_absolute
+    neg r3, r3
+    
+    a_absolute:
+    ldr r4, =a_Abs
+    str r3, [r4]
+    
+    mov r3, r1
+    cmp r3, 0
+    bge b_absolute
+    neg r3, r3
+    
+    b_absolute:
+    ldr r4, =b_Abs
+    str r3, [r4]
+    
+    ldr r2, =a_Abs
+    ldr r2, [r2]
+    ldr r3, =b_Abs
+    ldr r3, [r3]
+    
+    /***
+     * Check if multiplier or multiplicand is zero
+     * If so, go straight to setting the product to zero
+     * Load in the initial product for manipulation in our multiplication
+    ***/
+    cmp r2, 0
+    beq zero
+    cmp r3, 0
+    beq zero
+    
+    ldr r5, =init_Product
+    ldr r5, [r5]
+    
+    /***
+     * Check if our LSB is 1 using AND in order to mask other bits
+     * This makes comparison easy, just compare against zero
+     * If the LSB is 1, then add the multiplicand to the initial product
+     * Shift multiplicand left one bit, multiplier right by 1
+    ***/
+    multiply:
+    and r4, r3, 1
+    cmp r4, 0
+    addne r5, r5, r2
+    lsl r2, r2, 1
+    lsr r3, r3, 1
+    
+    /***
+     * If the multiplier has not yet been reduced to zero, we are not done
+     * Loop back to the beginning of our operation
+    ***/
+    cmp r3, 0
+    bne multiply
+    
+    /***
+     * Load in our previous determination of whether our product is negative
+     * If it is, negate our current initial product, then store that into final
+    ***/
+    ldr r6, =init_Product
+    str r5, [r6]
+    
+    ldr r7, =prod_Is_Neg
+    ldr r7, [r7]
+    
+    cmp r7, 1
+    negeq r5, r5
+    
+    ldr r6, =final_Product
+    str r5, [r6]
+    
+    ldr r0, =final_Product
+    ldr r0, [r0]
+    
+    b done
+    
+    /* Pretty simple here, just return zero. Final product is already zero */
+    zero:
+    mov r0, 0
+    
+    b done
+    
+    /* We have an error! The args were out of range, and the product is zero */
+    error:
+    ldr r2, =rng_Error
+    ldr r3, =1
+    str r3, [r2]
+    
+    mov r0, 0
+    
+    b done
     
     /*** STUDENTS: Place your code ABOVE this line!!! **************/
 
